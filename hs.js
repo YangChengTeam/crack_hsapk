@@ -1,3 +1,5 @@
+//cnpm i md5 request cheerio
+
 const fs = require("fs");
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
@@ -50,12 +52,21 @@ function common(path, params){
     }
     default_params.timestamp = new Date().getTime();
     var url= base_url + path + md5Params(default_params);
+    console.log(url);
     var promise = new Promise((r, j)=>{
         request.get(url, (e,resp)=>{
             if(e){
                j();
             }{
-               r(JSON.parse(resp.body));
+              try{   
+                console.log(resp.body)
+                r(JSON.parse(resp.body));
+              }catch(e){
+                console.log(e);
+                j();
+              }finally{
+               
+              }
             }
         });
     });
@@ -92,12 +103,12 @@ function school_topArticleNews(recommended, page){
 }
 
 
-function school_articleNews(cid, page){
+function school_articleNews(page, cid){
     return common("school/articleNews?",  `{"cid":"${cid}", "page":"${page}"}`);
 }
 
-function school_listNews(cid, page){
-    return common("school/list?",  `{"cid":"${cid}", page":"${page}"}`);
+function school_listNews(page, cid){
+    return common("school/list?",  `{"cid":"${cid}", "page":"${page}"}`);
 }
 
 function video(page, is_index, is_wallpaper, cid){
@@ -160,13 +171,14 @@ async function page_loop(fun_list, type , obj={id:""}){
     var page = 1;
     for(;;){
         var list_data = await fun_list(page, obj.id);
+        console.log(obj.id);
         if(list_data.code == 200 && list_data.data && list_data.data.length > 0){
             w("hs/list_data_"+ type + (obj.id ? "_" + obj.id : "") + "_"+page+".json",JSON.stringify(list_data));
             if(obj.callbck){
                 obj.callbck(list_data, type, page);
             }
         } else {
-            console.log("共" + page + "页");
+            console.log("共" + (page--) + "页");
             break;
         }
         if(page >=100 ){
@@ -190,6 +202,8 @@ async function main1(){
         }
     }
 }
+
+
 // 学堂
 async function main2(){
     await page_loop(school, "school", {"id": "", callbck: async (school_data)=>{
@@ -206,6 +220,20 @@ async function main2(){
             }
         }
     }});
+}
+
+async function main22(){
+    for(i=1; i < 40; i++){
+        await page_loop(school_listNews, "schoolList", {id: i});
+    }
+}
+
+async function main23(){
+    for(i=1; i < 40; i++){
+        await page_loop(school_articleNews, "school_articleNews", {id: i});
+    }
+
+    
 }
 
 // 情话
@@ -266,8 +294,26 @@ async function main4(){
 }
 
 async function main5(){
-   var list_data =await search(0, 1, "爱你");
-   console.log(list_data);
+   var keywords = `耀 躁 嚼 嚷 籍 魔 灌 蠢 霸 露 囊 罐`
+   var keywords =  keywords.split(" ")
+   for(var i = 0; i < keywords.length ; i++){
+        keyword = keywords[i].trim().replace("\r","").replace("\n","");
+        if(keyword.length == 0){
+            continue;
+        }
+        console.log(keyword);
+        var page = 1;
+        for(;;){
+            var list_data = await search(0, page, keyword);
+            if(list_data.code == 200 && list_data.data && list_data.data.length > 0){
+                w("hs/list_data_search_"+page+"_"+keyword+".json", JSON.stringify(list_data));
+            } else {
+                console.log("搜索"+keyword + "共" + (page-1) + "页");
+                break;
+            } 
+            page++;
+        }
+   }
 }
 
 function main(){
@@ -275,7 +321,11 @@ function main(){
     // main2();
     // main3();
     // main4()
-    main5();
+    // main5();
+
+    main23();
 }
 
-main();
+module.exports = {
+    school_topArticleNews
+}
